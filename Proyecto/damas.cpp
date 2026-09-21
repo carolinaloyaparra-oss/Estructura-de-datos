@@ -1,27 +1,39 @@
 #include <iostream>
-#include <cmath>
-
+#include <vector>
 using namespace std;
 
 char tablero[8][8];
+vector<string> historial;
 
 void mostrar() {
-    cout << "\n  0 1 2 3 4 5 6 7\n";
+    cout << "\n    A B C D E F G H\n";
     for (int f = 0; f < 8; f++) {
-        cout << f << " ";
-        for (int c = 0; c < 8; c++) cout << tablero[f][c] << " ";
+        cout << f + 1 << "  ";
+        for (int c = 0; c < 8; c++) {
+            char pieza = tablero[f][c];
+            if (pieza == 'x') cout << "\033[31m" << "x" << "\033[0m ";
+            else if (pieza == 'o') cout << "\033[34m" << "o" << "\033[0m ";
+            else if (pieza == '.') cout << "\033[37m" << "." << "\033[0m ";
+            else cout << "  ";
+        }
         cout << "\n";
     }
 }
 
+void mostrarHistorial() {
+    cout << "Historial de jugadas:\n";
+    for (size_t i = 0; i < historial.size(); i++) {
+        cout << i + 1 << ". " << historial[i] << "\n";
+    }
+}
+
 int main() {
-    // 1. Colocar fichas iniciales
     for (int f = 0; f < 8; f++) {
         for (int c = 0; c < 8; c++) {
             if ((f + c) % 2 != 0) {
-                if (f < 3) tablero[f][c] = 'x';      // Jugador 1
-                else if (f > 4) tablero[f][c] = 'o'; // Jugador 2
-                else tablero[f][c] = '.';            // Casilla vacia
+                if (f < 3) tablero[f][c] = 'x';
+                else if (f > 4) tablero[f][c] = 'o';
+                else tablero[f][c] = '.';
             } else tablero[f][c] = ' ';
         }
     }
@@ -32,42 +44,45 @@ int main() {
         mostrar();
         cout << "\nTurno del Jugador [" << turno << "]\n";
         
-        int f, c;
-        cout << "Fila y Columna de la ficha a mover: ";
-        cin >> f >> c;
+        int f;
+        char col;
+        cout << "Fila (1-8) y Columna (A-H) de la ficha a mover: ";
+        cin >> f >> col;
 
-        // Validar que la ficha sea del jugador actual
+        f = f - 1;
+        int c = col - 'A';
+
         if (tablero[f][c] != turno) {
             cout << "¡Esa no es tu ficha!\n";
             continue;
         }
 
-        int dir = (turno == 'x') ? 1 : -1; // 'x' baja (+1), 'o' sube (-1)
+        int dir = (turno == 'x') ? 1 : -1;
         char enemigo = (turno == 'x') ? 'o' : 'x';
 
-        // Comprobar opciones a la Izquierda (c - 1) y Derecha (c + 1)
         bool puedeIzq = false, puedeDer = false;
         bool comerIzq = false, comerDer = false;
 
-        // Opción Izquierda
-        if (c - 1 >= 0) {
+        if (c - 1 >= 0 && f + dir >= 0 && f + dir < 8) {
             if (tablero[f + dir][c - 1] == '.') puedeIzq = true;
-            else if (tablero[f + dir][c - 1] == enemigo && tablero[f + 2*dir][c - 2] == '.') {
+            else if (tablero[f + dir][c - 1] == enemigo && 
+                     f + 2*dir >= 0 && f + 2*dir < 8 && c - 2 >= 0 &&
+                     tablero[f + 2*dir][c - 2] == '.') {
                 puedeIzq = true;
                 comerIzq = true;
             }
         }
 
-        // Opción Derecha
-        if (c + 1 < 8) {
+        if (c + 1 < 8 && f + dir >= 0 && f + dir < 8) {
             if (tablero[f + dir][c + 1] == '.') puedeDer = true;
-            else if (tablero[f + dir][c + 1] == enemigo && tablero[f + 2*dir][c + 2] == '.') {
+            else if (tablero[f + dir][c + 1] == enemigo && 
+                     f + 2*dir >= 0 && f + 2*dir < 8 && c + 2 < 8 &&
+                     tablero[f + 2*dir][c + 2] == '.') {
                 puedeDer = true;
                 comerDer = true;
             }
         }
 
-        // Mostrar opciones al usuario
         if (!puedeIzq && !puedeDer) {
             cout << "¡Esta ficha no se puede mover!\n";
             continue;
@@ -81,24 +96,32 @@ int main() {
         cout << "Elige (1 o 2): ";
         cin >> opcion;
 
-        // Aplicar movimiento
+        string jugada;
+
         if (opcion == 1 && puedeIzq) {
             int salto = comerIzq ? 2 : 1;
             tablero[f + dir * salto][c - salto] = turno;
             tablero[f][c] = '.';
-            if (comerIzq) tablero[f + dir][c - 1] = '.'; // Borra la comidad
-            turno = (turno == 'x') ? 'o' : 'x'; // Cambia turno
+            if (comerIzq) tablero[f + dir][c - 1] = '.';
+            jugada = string("Jugador ") + turno + ": " + col + to_string(f+1) + " ___ " + 
+                     char('A' + (c - salto)) + to_string(f + dir*salto + 1);
+            historial.push_back(jugada);
+            turno = (turno == 'x') ? 'o' : 'x';
         } 
         else if (opcion == 2 && puedeDer) {
             int salto = comerDer ? 2 : 1;
             tablero[f + dir * salto][c + salto] = turno;
             tablero[f][c] = '.';
-            if (comerDer) tablero[f + dir][c + 1] = '.'; // Borra la comida
-            turno = (turno == 'x') ? 'o' : 'x'; // Cambia turno
+            if (comerDer) tablero[f + dir][c + 1] = '.';
+            jugada = string("Jugador ") + turno + ": " + col + to_string(f+1) + " ___ " + 
+                     char('A' + (c + salto)) + to_string(f + dir*salto + 1);
+            historial.push_back(jugada);
+            turno = (turno == 'x') ? 'o' : 'x';
         } 
         else {
-            cout << "¡Opcion invalida!\n";
+            cout << "¡Opción inválida!\n";
         }
+        mostrarHistorial();
     }
 
     return 0;
