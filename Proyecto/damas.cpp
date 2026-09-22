@@ -1,30 +1,48 @@
 #include <iostream>
 #include <vector>
+#include <chrono>
+#include <conio.h>
+
 using namespace std;
+
+#define TECLA_IZQUIERDA 75
+#define TECLA_DERECHA 77
+#define TECLA_ENTER 13
+#define TECLA_ESC 27
 
 char tablero[8][8];
 vector<string> historial;
 
-void mostrar() {
+void mostrar(int cursorFila, int cursorCol) {
+    system("cls");
     cout << "\n    A B C D E F G H\n";
     for (int f = 0; f < 8; f++) {
         cout << f + 1 << "  ";
         for (int c = 0; c < 8; c++) {
+            bool esCursor = (f == cursorFila && c == cursorCol);
+            
+            if (esCursor) cout << "[";
+            else cout << " ";
+
             char pieza = tablero[f][c];
-            if (pieza == 'x') cout << "\033[31m" << "x" << "\033[0m ";
-            else if (pieza == 'o') cout << "\033[34m" << "o" << "\033[0m ";
-            else if (pieza == '.') cout << "\033[37m" << "." << "\033[0m ";
-            else cout << "  ";
+            if (pieza == 'x') cout << "\033[31m" << "x" << "\033[0m";
+            else if (pieza == 'o') cout << "\033[34m" << "o" << "\033[0m";
+            else if (pieza == '.') cout << "\033[37m" << "." << "\033[0m";
+            else cout << " ";
+
+            if (esCursor) cout << "]";
+            else cout << " ";
         }
         cout << "\n";
     }
 }
 
 void mostrarHistorial() {
-    cout << "Historial de jugadas:\n";
+    cout << "\n--- Historial de jugadas ---\n";
     for (size_t i = 0; i < historial.size(); i++) {
         cout << i + 1 << ". " << historial[i] << "\n";
     }
+    cout << "---------------------------\n";
 }
 
 int main() {
@@ -39,21 +57,70 @@ int main() {
     }
 
     char turno = 'x';
+    const int TIEMPO_LIMITE = 30;
+    int cursorFila = 0, cursorCol = 0;
 
     while (true) {
-        mostrar();
-        cout << "\nTurno del Jugador [" << turno << "]\n";
-        
-        int f;
-        char col;
-        cout << "Fila (1-8) y Columna (A-H) de la ficha a mover: ";
-        cin >> f >> col;
+        mostrar(cursorFila, cursorCol);
+        cout << "\nTurno del Jugador [" << turno << "] (Limite: " << TIEMPO_LIMITE << "s)\n";
+        cout << "Usa FLECHA IZQ / DER para recorrer casillas, ENTER para seleccionar, ESC para rendirte.\n";
+        mostrarHistorial();
 
-        f = f - 1;
-        int c = col - 'A';
+        auto inicio = chrono::steady_clock::now();
+        
+        int f = -1, c = -1;
+        bool seleccionado = false;
+
+        while (!seleccionado) {
+            if (_kbhit()) {
+                int tecla = _getch();
+                if (tecla == 0 || tecla == 224) {
+                    tecla = _getch();
+                    if (tecla == TECLA_IZQUIERDA) {
+                        cursorCol--;
+                        if (cursorCol < 0) {
+                            cursorCol = 7;
+                            cursorFila--;
+                            if (cursorFila < 0) cursorFila = 7;
+                        }
+                    }
+                    if (tecla == TECLA_DERECHA) {
+                        cursorCol++;
+                        if (cursorCol > 7) {
+                            cursorCol = 0;
+                            cursorFila++;
+                            if (cursorFila > 7) cursorFila = 0;
+                        }
+                    }
+                } else if (tecla == TECLA_ENTER) {
+                    f = cursorFila;
+                    c = cursorCol;
+                    seleccionado = true;
+                } else if (tecla == TECLA_ESC) {
+                    char ganador = (turno == 'x') ? 'o' : 'x';
+                    cout << "\n¡El jugador [" << turno << "] se ha rendido! ¡Gana el jugador [" << ganador << "]!\n";
+                    return 0;
+                }
+                mostrar(cursorFila, cursorCol);
+                cout << "\nTurno del Jugador [" << turno << "] (Limite: " << TIEMPO_LIMITE << "s)\n";
+                cout << "Usa FLECHA IZQ / DER para recorrer casillas, ENTER para seleccionar, ESC para rendirte.\n";
+                mostrarHistorial();
+            }
+
+            auto actual = chrono::steady_clock::now();
+            if (chrono::duration_cast<chrono::seconds>(actual - inicio).count() > TIEMPO_LIMITE) {
+                cout << "\n¡Tiempo agotado! Se pasa el turno.\n";
+                turno = (turno == 'x') ? 'o' : 'x';
+                _getch();
+                break;
+            }
+        }
+
+        if (!seleccionado) continue;
 
         if (tablero[f][c] != turno) {
-            cout << "¡Esa no es tu ficha!\n";
+            cout << "\n¡Selecciona una casilla con una de tus fichas!\n";
+            _getch();
             continue;
         }
 
@@ -84,44 +151,51 @@ int main() {
         }
 
         if (!puedeIzq && !puedeDer) {
-            cout << "¡Esta ficha no se puede mover!\n";
+            cout << "\n¡Esta ficha no tiene movimientos disponibles!\n";
+            _getch();
             continue;
         }
 
-        cout << "¿Hacia donde mover?\n";
-        if (puedeIzq) cout << "  1) Izquierda " << (comerIzq ? "(Comer)" : "") << "\n";
-        if (puedeDer) cout << "  2) Derecha " << (comerDer ? "(Comer)" : "") << "\n";
+        cout << "\n¿Hacia donde mover?\n";
+        if (puedeIzq) cout << "  FLECHA IZQUIERDA " << (comerIzq ? "(Comer)" : "") << "\n";
+        if (puedeDer) cout << "  FLECHA DERECHA " << (comerDer ? "(Comer)" : "") << "\n";
+        cout << "  ESC) Rendirse\n";
         
-        int opcion;
-        cout << "Elige (1 o 2): ";
-        cin >> opcion;
-
-        string jugada;
-
-        if (opcion == 1 && puedeIzq) {
-            int salto = comerIzq ? 2 : 1;
-            tablero[f + dir * salto][c - salto] = turno;
-            tablero[f][c] = '.';
-            if (comerIzq) tablero[f + dir][c - 1] = '.';
-            jugada = string("Jugador ") + turno + ": " + col + to_string(f+1) + " ___ " + 
-                     char('A' + (c - salto)) + to_string(f + dir*salto + 1);
-            historial.push_back(jugada);
-            turno = (turno == 'x') ? 'o' : 'x';
-        } 
-        else if (opcion == 2 && puedeDer) {
-            int salto = comerDer ? 2 : 1;
-            tablero[f + dir * salto][c + salto] = turno;
-            tablero[f][c] = '.';
-            if (comerDer) tablero[f + dir][c + 1] = '.';
-            jugada = string("Jugador ") + turno + ": " + col + to_string(f+1) + " ___ " + 
-                     char('A' + (c + salto)) + to_string(f + dir*salto + 1);
-            historial.push_back(jugada);
-            turno = (turno == 'x') ? 'o' : 'x';
-        } 
-        else {
-            cout << "¡Opción inválida!\n";
+        bool movido = false;
+        while (!movido) {
+            int tecla = _getch();
+            if (tecla == 0 || tecla == 224) {
+                tecla = _getch();
+                if (tecla == TECLA_IZQUIERDA && puedeIzq) {
+                    int salto = comerIzq ? 2 : 1;
+                    tablero[f + dir * salto][c - salto] = turno;
+                    tablero[f][c] = '.';
+                    if (comerIzq) tablero[f + dir][c - 1] = '.';
+                    
+                    string jugada = string("Jugador ") + turno + ": " + char('A' + c) + to_string(f+1) + " -> " + 
+                             char('A' + (c - salto)) + to_string(f + dir*salto + 1);
+                    historial.push_back(jugada);
+                    turno = (turno == 'x') ? 'o' : 'x';
+                    movido = true;
+                } 
+                else if (tecla == TECLA_DERECHA && puedeDer) {
+                    int salto = comerDer ? 2 : 1;
+                    tablero[f + dir * salto][c + salto] = turno;
+                    tablero[f][c] = '.';
+                    if (comerDer) tablero[f + dir][c + 1] = '.';
+                    
+                    string jugada = string("Jugador ") + turno + ": " + char('A' + c) + to_string(f+1) + " -> " + 
+                             char('A' + (c + salto)) + to_string(f + dir*salto + 1);
+                    historial.push_back(jugada);
+                    turno = (turno == 'x') ? 'o' : 'x';
+                    movido = true;
+                }
+            } else if (tecla == TECLA_ESC) {
+                char ganador = (turno == 'x') ? 'o' : 'x';
+                cout << "\n¡El jugador [" << turno << "] se ha rendido! ¡Gana el jugador [" << ganador << "]!\n";
+                return 0;
+            }
         }
-        mostrarHistorial();
     }
 
     return 0;
